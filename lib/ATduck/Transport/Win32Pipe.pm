@@ -18,7 +18,13 @@ my $PIPESIG = 'USR1';
     shift @rtsigs while @rtsigs && $rtsigs[0] ne 'RTMIN';
     if ( 5 < @rtsigs ) { $PIPESIG = $rtsigs[5] }
 }
-$SIG{$PIPESIG} = \&_cleanup;
+# The cleanup signal is only used at runtime. Native Windows does not
+# understand Posix signal names like SIGUSR1, so don't warn at startup
+# (and don't abort) when the chosen signal is unavailable.
+{
+    local $SIG{__WARN__} = sub { warn @_ unless $_[0] =~ /No such signal/i };
+    eval { $SIG{$PIPESIG} = \&_cleanup; 1 };
+}
 
 # Open a Win32 Named Pipe
 sub new_client {
@@ -32,6 +38,8 @@ sub new_client {
     foreach ( qw/Win32API::File Win32::Event/ ) {
         die(($@||$!)."\nWin32Pipe: Can't load $_") unless eval "use $_; 1";
     }
+    die "Win32Pipe: name-pipe cleanup signal ($PIPESIG) is unavailable on ".
+        "this platform\n" unless exists $SIG{$PIPESIG};
 
     # Open the named pipe
     $self->{pipe} = Win32API::File::createFile

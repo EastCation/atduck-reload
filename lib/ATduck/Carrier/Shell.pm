@@ -1,13 +1,18 @@
 package ATduck::Carrier::Shell;
 # This file is part of ATduck
 use POSIX;
-use IO::Pty;
 use IPC::Open2;
 use ATduck::Carrier;
 use warnings;
 use strict;
 
 our @ISA = qw(ATduck::Carrier);
+
+# IO::Pty is unavailable on native (Strawberry) Windows. When it is missing,
+# subprocesses (e.g. SLiRP) are connected through plain pipes instead of a
+# PTY, so the `usepty` flag is silently downgraded.
+my $HAVE_IO_PTY;
+$HAVE_IO_PTY = eval 'use IO::Pty; 1';
 
 sub new {
     my ($class, $modem, $arg) = @_;
@@ -22,7 +27,7 @@ sub new {
     local $ENV{M_TTYNAME} = $self->_pty('name') if $self->{pty};
     local $ENV{TERM} = 'vt100';
     $self->{pid} = open2($self->{readpipe}, $self->{writepipe},
-                         'sh', '-c', $self->{data});
+                         $self->_shell(), '-c', $self->{data});
     # Check that open2 succeeded
     return undef unless $self->{pid};
     # Set up filehandles
@@ -32,11 +37,35 @@ sub new {
     return $self;
 }
 
+# Choose a shell for the subprocess. Cygwin and Unix have `sh`; native
+# Windows usually does not have `sh` on PATH, but Git for Windows ships
+# one. Fall back to Git's install locations so the dialing plan's POSIX
+# script can still run even when PATH is not set up for it.
+sub _shell {
+    return 'sh' if $^O !~ /MSWin32/i;
+    foreach my $candidate (
+        'C:/Program Files/Git/bin/sh.exe',
+        'C:/Program Files/Git/usr/bin/sh.exe',
+        'C:/Program Files (x86)/Git/bin/sh.exe',
+        'C:/Program Files/Git/usr/bin/bash.exe',
+        'C:/Program Files (x86)/Git/usr/bin/bash.exe',
+    ) {
+        return $candidate if -e $candidate;
+    }
+    return 'sh';    # no Git shell found; let open2 report the failure clearly
+}
+
 # Allocate a PTY to use instead of STDIN/STDOUT
 sub _pty {
     my ($self, $flag) = @_;
     if ( !$self->{pty} ) {
-        $self->{pty} = new IO::Pty;
+        # Native (Strawberry) Windows has no IO::Pty; fall back to plain
+        # stdio pipes so subprocesses like SLiRP can still run in slip mode.
+        # Note: refer to the class through a string so strict 'subs' is
+        # happy even when IO::Pty is only loaded lazily at runtime.
+        return undef unless $HAVE_IO_PTY;
+        my $pty_class = 'IO::Pty';
+        $self->{pty} = $pty_class->new();
         # Turn off echo and other unplesantness.
         # Required on cygwin because subprocesses have incredible overhead,
         # and by the time SLiRP finally gets around to setting up the PTY,

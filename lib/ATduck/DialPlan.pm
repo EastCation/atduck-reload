@@ -130,14 +130,43 @@ while [ "$again" = y ]; do
 done
 
 <5555> type=Shell usepty
-SLIRP_PATH=./slirp-nandhp-patch
-if [ -e /bin/cygcheck ]; then SLIRP_PATH=$SLIRP_PATH.exe; fi
-$SLIRP_PATH ppp initiate-options "tty $M_TTYPATH"
+# SLiRP: PPP mode. This is the NAT / internet access entry point.
+# On Windows/Cygwin the built binary has a .exe suffix.
+SLIRP_EXT=
+if [ -e /bin/cygcheck ]; then SLIRP_EXT=.exe; fi
+SLIRP_PATH=./slirp/slirp-nandhp-patch
+if [ ! -x "$SLIRP_PATH" ] && [ -x "$SLIRP_PATH$SLIRP_EXT" ]; then
+    SLIRP_PATH=$SLIRP_PATH$SLIRP_EXT
+fi
+if [ ! -x "$SLIRP_PATH" ]; then
+    SLIRP_PATH=./slirp-nandhp-patch$SLIRP_EXT
+fi
+# PPP needs a terminal device; when none was allocated (no IO::Pty on
+# native Windows) pass an empty tty argument.
+if [ -n "$M_TTYPATH" ]; then
+    SLIRP_TTY="tty $M_TTYPATH"
+else
+    SLIRP_TTY="tty /dev/null"
+fi
+$SLIRP_PATH ppp initiate-options "$SLIRP_TTY"
 
 <5556> type=Shell usepty
-SLIRP_PATH=./slirp-nandhp-patch
-if [ -e /bin/cygcheck ]; then SLIRP_PATH=$SLIRP_PATH.exe; fi
-$SLIRP_PATH "tty $M_TTYPATH"
+# SLiRP: SLIP mode. Reads and writes on stdio (or the given tty), so this
+# is the mode that works on native Windows without a PTY.
+SLIRP_EXT=
+if [ -e /bin/cygcheck ]; then SLIRP_EXT=.exe; fi
+SLIRP_PATH=./slirp/slirp-nandhp-patch
+if [ ! -x "$SLIRP_PATH" ] && [ -x "$SLIRP_PATH$SLIRP_EXT" ]; then
+    SLIRP_PATH=$SLIRP_PATH$SLIRP_EXT
+fi
+if [ ! -x "$SLIRP_PATH" ]; then
+    SLIRP_PATH=./slirp-nandhp-patch$SLIRP_EXT
+fi
+if [ -n "$M_TTYPATH" ]; then
+    SLIRP_TTY="tty $M_TTYPATH"
+else
+    SLIRP_TTY=""
+fi
+$SLIRP_PATH "$SLIRP_TTY"
 
 <5559> type=Alias target=8,scn.org
-

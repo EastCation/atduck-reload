@@ -171,7 +171,32 @@ Configure the Modem Port to use I</tmp/modem>.
 
 =head1 WINDOWS NOTES
 
-B<ATduck> has been tested on Cygwin. Please be aware of the following Cygwin-specific issues:
+=head2 Running ATduck on Windows
+
+B<ATduck> can run on Windows in two ways:
+
+=over
+
+=item *
+
+Under B<Cygwin>, which provides a POSIX environment (Perl, C<sh>, C<make>, C<gcc>) that matches the Unix build. This is the best supported way to use PPP mode (5555) and requires the bundled SLiRP patches.
+
+=item *
+
+Under B<native Windows Perl> (e.g. Strawberry Perl). In this mode the I<IO::Pty>-based and I<UNIX> socket features are unavailable, so they are loaded lazily and skipped automatically. Use TCP sockets or Windows Named Pipes for the serial port, and SLiRP in SLIP mode (5556) for internet access, since no PTY is available.
+
+=back
+
+=head2 Setting up SLiRP for NAT (internet access)
+
+B<ATduck> does not provide NAT itself; it launches B<SLiRP> when you dial 5555 (PPP) or 5556 (SLIP). You must build SLiRP first, because only the fix patches are included here:
+
+    cd slirp
+    sh build-slirp-windows.sh       # run inside a Cygwin shell
+
+This downloads the slirp 1.0.17 source, applies the two included patches, and builds B<C<./slirp-nandhp-patch.exe>>. Then start ATduck and dial 5555 or 5556 from the emulator to get NAT internet access.
+
+=head2 Cygwin-specific notes
 
 =over
 
@@ -186,7 +211,7 @@ A patch against Debian's SLiRP 1.0.17-3 is included to resolve this issue.
 
 =back
 
-On Windows, UNIX sockets are not available and many emulators (including VMware and VirtualBox) use Windows Named Pipes instead. B<ATduck> supports Windows Named Pipes if the Perl modules Win32API::File and Win32::Event Perl are available. Install perl-libwin32 in Cygwin Setup.
+On Windows, UNIX sockets are not available and many emulators (including VMware and VirtualBox) use Windows Named Pipes instead. B<ATduck> supports Windows Named Pipes if the Perl modules Win32API::File and Win32::Event Perl are available. Install perl-libwin32 in Cygwin Setup (or install the matching modules under Strawberry Perl).
 
 To use Windows Named Pipes with VMware, configure the serial port to B<Use socket (named pipe)> B<\\.\pipe\>I<modem> from B<Server> to B<An Application>.
 Other emulators may be configured similarly.
@@ -245,4 +270,3 @@ ITU-T Recommendation V.250, "Serial asynchronus automatic dialling and control."
 U.S. Patent 4,549,302, "Modem with improved escape sequence mechanism to prevent escape in response to random occurrence of escape character in transmitted data." October 1985. L<http://www.google.com/patents/about?id=BFAyAAAAEBAJ>
 
 =cut
-

@@ -18,7 +18,7 @@ use ATduck::Modem;
 use warnings;
 use strict;
 
-our $VERSION = 20110321;
+our $VERSION = '1.0.0-CelestiaBuild (20261012)';
 
 # Info
 my @info = (127001,                             # I0 Numeric identification
@@ -57,6 +57,9 @@ sub install_transport {
 # Used to load all Transport and Carrier modules, thereby allowing plugins.
 sub _load_plugins {
     my ($realm) = @_;
+    # Remember already-loaded plugin files (by device+inode) so duplicate
+    # @INC entries (which exist on Windows) do not reload the same file.
+    my %seen = ();
     foreach my $base ( @INC ) {
         my $dir = "$base/ATduck/$realm";
         next unless -d $dir;
@@ -64,7 +67,12 @@ sub _load_plugins {
         foreach (readdir D) {
             next unless -f "$dir/$_";
             next unless $_ =~ m/^(.+)\.pm$/;
-            require "$dir/$_";
+            next if $seen{(stat("$dir/$_"))[0,1]}++;
+            # Plugins are optional: on Windows the IO::Pty-dependent
+            # transport (and carrier) modules may not be available.
+            # Fail to load one plugin without killing the whole program.
+            eval { require "$dir/$_"; 1 } or
+                warn "ATduck: skipping optional plugin $dir/$_: $@";
         }
         closedir(D);
     }
